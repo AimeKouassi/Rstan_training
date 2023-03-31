@@ -1,0 +1,75 @@
+---
+title: Espèces avec les meilleures caracteristiques pour produire du bois dans les
+  systèmes agroforestiers cacacoyers ivoiriens
+author: "Aimé Kouassi"
+date: "`r format(Sys.time(), '%d %B,%Y')`"
+always_allow_html: true
+output:
+  github_document:
+    toc: true
+    toc_depth: 3
+    df_print: paged
+---
+
+```{r package, message=FALSE, include=FALSE}
+knitr::opts_chunk$set(message=FALSE, warning=FALSE)
+library(here)
+library(tidyverse)
+library(gtools)
+library(knitr)
+library(kableExtra)
+library(funModeling)
+```
+
+```{r load data}
+load("comDB.Rdata")
+```
+
+
+```{r}
+# Chargement des bibliothèques nécessaires
+library(rstan)
+
+# Données d'entrée
+data <- list(
+  N = nrow(data),      # Nombre d'observations
+  Y = data$height,     # Hauteur de l'arbre
+  X = data$diameter,   # Diamètre de l'arbre
+  Z = data$species     # Espèce de l'arbre
+)
+
+# Spécification du modèle hiérarchique
+model <- "
+data {
+  int<lower=0> N;     // Nombre d'observations
+  vector[N] Y;        // Hauteur de l'arbre
+  vector[N] X;        // Diamètre de l'arbre
+  int<lower=1,upper=3> Z[N];  // Espèce de l'arbre (1, 2 ou 3)
+}
+
+parameters {
+  real alpha;          // Intercept
+  real beta;           // Coefficient de diamètre
+  vector[2] gamma;     // Coefficients de l'espèce
+  real<lower=0> sigma; // Variance des résidus
+}
+
+model {
+  // Priors
+  alpha ~ normal(0, 100);
+  beta ~ normal(0, 100);
+  gamma ~ normal(0, 100);
+
+  // Likelihood
+  for (i in 1:N)
+    Y[i] ~ normal(alpha + beta*X[i] + gamma[Z[i]], sigma);
+}
+"
+
+# Compilation du modèle
+compiled_model <- stan_model(model_code = model)
+
+# Fit du modèle aux données
+fit <- sampling(compiled_model, data = data)
+```
+
